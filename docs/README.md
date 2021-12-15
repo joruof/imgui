@@ -1,3 +1,20 @@
+Dear ImGui meets SVG
+=====
+
+Extends the draw list, to allow recording of draw list primitives as svg markup.
+This enables the export of interfaces created with dear imgui to svg. Especially helpful for plot export when used in combination with implot.
+
+### Working:
+
+* most of the primitives (rect, quad, polygon, ...)
+* text
+
+### Todo:
+
+* images (via embedding)
+* support for different fonts
+
+
 Dear ImGui
 =====
 [![Build Status](https://github.com/ocornut/imgui/workflows/build/badge.svg)](https://github.com/ocornut/imgui/actions?workflow=build) [![Static Analysis Status](https://github.com/ocornut/imgui/workflows/static-analysis/badge.svg)](https://github.com/ocornut/imgui/actions?workflow=static-analysis)

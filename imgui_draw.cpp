@@ -183,6 +183,29 @@ namespace IMGUI_STB_NAMESPACE
 using namespace IMGUI_STB_NAMESPACE;
 #endif
 
+#include <iomanip>
+
+void svgColor(ImU32 col, std::stringstream& svg) {
+
+    uint8_t r = (col >> 0) & 0xff;
+    uint8_t g = (col >> 8) & 0xff;
+    uint8_t b = (col >> 16) & 0xff;
+
+    svg << "#";
+    svg << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(r);
+    svg << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(g);
+    svg << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(b);
+}
+
+void svgOpacity(ImU32 col, std::stringstream& svg) {
+
+    uint8_t a = (col >> 24) & 0xff;
+
+    svg << "opacity=\"";
+    double opacity = (double)(a) / 255.0;
+    svg << opacity << "\" ";
+}
+
 //-----------------------------------------------------------------------------
 // [SECTION] Style functions
 //-----------------------------------------------------------------------------
@@ -1061,6 +1084,24 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
         }
         _VtxCurrentIdx += (ImDrawIdx)vtx_count;
     }
+
+    if (svg != nullptr) {
+
+        *svg << "<polygon points=\"";
+
+        for (int i = 0; i < points_count; i++) {
+            const ImVec2& p = points[i];
+            *svg  << p.x  << "," << p.y << " ";
+        }
+        *svg << "\" ";
+
+        *svg << "fill=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+
+        *svg << "/>\n";
+    }
 }
 
 void ImDrawList::_PathArcToFastEx(const ImVec2& center, float radius, int a_min_sample, int a_max_sample, int a_step)
@@ -1394,6 +1435,21 @@ void ImDrawList::AddLine(const ImVec2& p1, const ImVec2& p2, ImU32 col, float th
     PathLineTo(p1 + ImVec2(0.5f, 0.5f));
     PathLineTo(p2 + ImVec2(0.5f, 0.5f));
     PathStroke(col, 0, thickness);
+
+    if (svg != nullptr) {
+
+        *svg << "<line x1=\"" << p1.x << "\" y1=\"" << p1.y << "\"";
+        *svg << " x2=\"" << p2.x << "\" y2=\"" << p2.y << "\" ";
+
+        *svg << "stroke=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+
+        *svg << "stroke-width=\"" << thickness << "\" ";
+
+        *svg << "/>\n";
+    }
 }
 
 // p_min = upper-left, p_max = lower-right
@@ -1407,6 +1463,25 @@ void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, fl
     else
         PathRect(p_min + ImVec2(0.50f, 0.50f), p_max - ImVec2(0.49f, 0.49f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
     PathStroke(col, ImDrawFlags_Closed, thickness);
+
+    if (svg != nullptr) {
+
+        ImVec2 size = p_max - p_min;
+
+        *svg << "<rect x=\"" << p_min.x << "\" y=\"" << p_min.y << "\"";
+        *svg << " width=\"" << size.x << "\" height=\"" << size.y << "\" ";
+        *svg << " rx=\"" << rounding / 2.0 << "\" ";
+
+        *svg << "fill=\"none\" ";
+
+        *svg << "stroke=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+        *svg << "stroke-width=\"" << thickness << "\" ";
+
+        *svg << "/>\n";
+    }
 }
 
 void ImDrawList::AddRectFilled(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, float rounding, ImDrawFlags flags)
@@ -1422,6 +1497,22 @@ void ImDrawList::AddRectFilled(const ImVec2& p_min, const ImVec2& p_max, ImU32 c
     {
         PathRect(p_min, p_max, rounding, flags);
         PathFillConvex(col);
+    }
+
+    if (svg != nullptr) {
+
+        ImVec2 size = p_max - p_min;
+
+        *svg << "<rect x=\"" << p_min.x << "\" y=\"" << p_min.y << "\"";
+        *svg << " width=\"" << size.x << "\" height=\"" << size.y << "\" ";
+        *svg << " rx=\"" << rounding / 2.0 << "\" ";
+
+        *svg << "fill=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+
+        *svg << "/>\n";
     }
 }
 
@@ -1509,6 +1600,22 @@ void ImDrawList::AddCircle(const ImVec2& center, float radius, ImU32 col, int nu
     }
 
     PathStroke(col, ImDrawFlags_Closed, thickness);
+
+    if (svg != nullptr) {
+
+        *svg << "<circle cx=\"" << center.x << "\" cy=\"" << center.y << "\"";
+        *svg << " r=\"" << radius << "\" ";
+
+        *svg << "fill=\"none\"";
+
+        *svg << "stroke=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+        *svg << "stroke-width=\"" << thickness << "\" ";
+
+        *svg << "/>\n";
+    }
 }
 
 void ImDrawList::AddCircleFilled(const ImVec2& center, float radius, ImU32 col, int num_segments)
@@ -1533,6 +1640,19 @@ void ImDrawList::AddCircleFilled(const ImVec2& center, float radius, ImU32 col, 
     }
 
     PathFillConvex(col);
+
+    if (svg != nullptr) {
+
+        *svg << "<circle cx=\"" << center.x << "\" cy=\"" << center.y << "\"";
+        *svg << " r=\"" << radius << "\" ";
+
+        *svg << "fill=\"";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+
+        *svg << "/>\n";
+    }
 }
 
 // Guaranteed to honor 'num_segments'
@@ -1608,6 +1728,25 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
         clip_rect.w = ImMin(clip_rect.w, cpu_fine_clip_rect->w);
     }
     font->RenderText(this, font_size, pos, col, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
+
+    if (svg != nullptr) {
+
+        *svg << "<text x=\"" << pos.x << "\" y=\"" << pos.y + 16 << "\" ";
+
+        *svg << "fill=\" ";
+        svgColor(col, *svg);
+        *svg << "\" ";
+        svgOpacity(col, *svg);
+
+        *svg << "font-size=\"" << "16px\" ";
+        *svg << "font-family=\"" << "Source Sans Pro" << "\"";
+
+        size_t text_len = text_end - text_begin;
+            
+        *svg << ">";
+        *svg << std::string(text_begin, text_len);
+        *svg << "</text>\n";
+    }
 }
 
 void ImDrawList::AddText(const ImVec2& pos, ImU32 col, const char* text_begin, const char* text_end)
