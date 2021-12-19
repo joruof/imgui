@@ -11,6 +11,7 @@ This enables the export of interfaces created with dear imgui to svg. Especially
 
 ### Todo:
 
+* clipping
 * images (via embedding)
 * support for different fonts
 
