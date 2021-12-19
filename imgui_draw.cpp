@@ -1731,6 +1731,10 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
 
     if (svg != nullptr) {
 
+        *svg << "<clipPath id=\""<< "test" <<"\" >";
+        *svg << "<rect x=\"" << clip_rect.x << "\" y=\"" << clip_rect.y << "\" width=\"" << clip_rect.z <<"\" height=\"" << clip_rect.w << "\" />";
+        *svg << "</clipPath>";
+
         *svg << "<text x=\"" << pos.x << "\" y=\"" << pos.y + 16 << "\" ";
 
         *svg << "fill=\" ";
@@ -1742,6 +1746,8 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
         *svg << "font-family=\"" << "Source Sans Pro" << "\"";
 
         size_t text_len = text_end - text_begin;
+
+        //*svg << "clipPath=\" ";
             
         *svg << ">";
         *svg << std::string(text_begin, text_len);
