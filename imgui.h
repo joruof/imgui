@@ -2505,6 +2505,10 @@ void svgOpacity(ImU32 col, std::stringstream& svg);
 struct ImDrawList
 {
     inline static std::stringstream* svg;
+    inline static int svgMinX = 0;
+    inline static int svgMaxX = 0;
+    inline static int svgMaxY = 0;
+    inline static int svgMinY = 0;
 
     // This is what you have to render
     ImVector<ImDrawCmd>     CmdBuffer;          // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.

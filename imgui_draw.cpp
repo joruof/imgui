@@ -22,6 +22,8 @@ Index of this file:
 
 */
 
+#include <iostream>
+
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -184,6 +186,20 @@ using namespace IMGUI_STB_NAMESPACE;
 #endif
 
 #include <iomanip>
+
+void svgConsiderPoint(int x, int y) {
+
+    ImDrawList::svgMaxX = std::max(ImDrawList::svgMaxX, x);
+    ImDrawList::svgMaxY = std::max(ImDrawList::svgMaxY, y);
+    ImDrawList::svgMinX = std::min(ImDrawList::svgMinX, x);
+    ImDrawList::svgMinY = std::min(ImDrawList::svgMinY, y);
+}
+
+void svgConsiderRect(int x, int y, int w, int h) {
+
+    svgConsiderPoint(x, y);
+    svgConsiderPoint(x+w, y+h);
+}
 
 void svgColor(ImU32 col, std::stringstream& svg) {
 
@@ -1092,6 +1108,7 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
         for (int i = 0; i < points_count; i++) {
             const ImVec2& p = points[i];
             *svg  << p.x  << "," << p.y << " ";
+            svgConsiderPoint((int)p.x, (int)p.y);
         }
         *svg << "\" ";
 
@@ -1438,6 +1455,9 @@ void ImDrawList::AddLine(const ImVec2& p1, const ImVec2& p2, ImU32 col, float th
 
     if (svg != nullptr) {
 
+        svgConsiderPoint(p1.x, p1.y);
+        svgConsiderPoint(p2.x, p2.y);
+
         *svg << "<line x1=\"" << p1.x << "\" y1=\"" << p1.y << "\"";
         *svg << " x2=\"" << p2.x << "\" y2=\"" << p2.y << "\" ";
 
@@ -1467,6 +1487,8 @@ void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, fl
     if (svg != nullptr) {
 
         ImVec2 size = p_max - p_min;
+
+        svgConsiderRect(p_min.x, p_min.y, size.x, size.y);
 
         *svg << "<rect x=\"" << p_min.x << "\" y=\"" << p_min.y << "\"";
         *svg << " width=\"" << size.x << "\" height=\"" << size.y << "\" ";
@@ -1502,6 +1524,8 @@ void ImDrawList::AddRectFilled(const ImVec2& p_min, const ImVec2& p_max, ImU32 c
     if (svg != nullptr) {
 
         ImVec2 size = p_max - p_min;
+
+        svgConsiderRect(p_min.x, p_min.y, size.x, size.y);
 
         *svg << "<rect x=\"" << p_min.x << "\" y=\"" << p_min.y << "\"";
         *svg << " width=\"" << size.x << "\" height=\"" << size.y << "\" ";
@@ -1603,6 +1627,8 @@ void ImDrawList::AddCircle(const ImVec2& center, float radius, ImU32 col, int nu
 
     if (svg != nullptr) {
 
+        svgConsiderRect(center.x, center.y, radius*2, radius*2);
+
         *svg << "<circle cx=\"" << center.x << "\" cy=\"" << center.y << "\"";
         *svg << " r=\"" << radius << "\" ";
 
@@ -1642,6 +1668,8 @@ void ImDrawList::AddCircleFilled(const ImVec2& center, float radius, ImU32 col, 
     PathFillConvex(col);
 
     if (svg != nullptr) {
+
+        svgConsiderRect(center.x, center.y, radius*2, radius*2);
 
         *svg << "<circle cx=\"" << center.x << "\" cy=\"" << center.y << "\"";
         *svg << " r=\"" << radius << "\" ";
@@ -1731,9 +1759,24 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
 
     if (svg != nullptr) {
 
-        *svg << "<clipPath id=\""<< "test" <<"\" >";
-        *svg << "<rect x=\"" << clip_rect.x << "\" y=\"" << clip_rect.y << "\" width=\"" << clip_rect.z <<"\" height=\"" << clip_rect.w << "\" />";
-        *svg << "</clipPath>";
+        uint64_t id = svg->tellp();
+
+        if (cpu_fine_clip_rect) {
+
+            svgConsiderPoint(clip_rect.x, clip_rect.y);
+            svgConsiderPoint(clip_rect.z, clip_rect.w);
+
+            *svg << "<clipPath id=\""<< id <<"\" >";
+            *svg << "<rect x=\"" << clip_rect.x
+                 << "\" y=\"" << clip_rect.y
+                 << "\" width=\"" << clip_rect.z - clip_rect.x
+                 <<"\" height=\"" << clip_rect.w - clip_rect.y
+                 << "\" />";
+            *svg << "</clipPath>\n";
+        } else {
+            ImVec2 textSize = ImGui::CalcTextSize(text_begin, text_end, true, wrap_width);
+            svgConsiderRect(pos.x, pos.y, textSize.x, textSize.y);
+        }
 
         *svg << "<text x=\"" << pos.x << "\" y=\"" << pos.y + 16 << "\" ";
 
@@ -1743,11 +1786,10 @@ void ImDrawList::AddText(const ImFont* font, float font_size, const ImVec2& pos,
         svgOpacity(col, *svg);
 
         *svg << "font-size=\"" << "16px\" ";
-        *svg << "font-family=\"" << "Source Sans Pro" << "\"";
+        *svg << "font-family=\"" << "Source Sans Pro" << "\" ";
+        *svg << "clip-path=\"url(#" << id << ")\" ";
 
         size_t text_len = text_end - text_begin;
-
-        //*svg << "clipPath=\" ";
             
         *svg << ">";
         *svg << std::string(text_begin, text_len);
