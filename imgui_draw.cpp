@@ -770,15 +770,17 @@ void ImDrawList::AddPolyline(const ImVec2* points, const int points_count, ImU32
     if (points_count < 2)
         return;
 
+    thickness *= _InvTransformationScale;
+
     const bool closed = (flags & ImDrawFlags_Closed) != 0;
     const ImVec2 opaque_uv = _Data->TexUvWhitePixel;
     const int count = closed ? points_count : points_count - 1; // The number of line segments we need to draw
-    const bool thick_line = (thickness > _FringeScale);
+    const bool thick_line = ((fabsf(thickness) > _FringeScale) || (fabsf(_InvTransformationScale - 1.0f) > FLT_EPSILON));
 
     if (Flags & ImDrawListFlags_AntiAliasedLines)
     {
         // Anti-aliased stroke
-        const float AA_SIZE = _FringeScale;
+        const float AA_SIZE = _FringeScale * _InvTransformationScale;
         const ImU32 col_trans = col & ~IM_COL32_A_MASK;
 
         // Thicknesses <1.0 should behave like thickness 1.0
@@ -1031,7 +1033,8 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
     if (Flags & ImDrawListFlags_AntiAliasedFill)
     {
         // Anti-aliased Fill
-        const float AA_SIZE = _FringeScale;
+        const float DIRECTION = (((_HalfPixel.x < 0.0f) ^ (_HalfPixel.y < 0.0f)) ? -1.0f : 1.0f);
+        const float AA_SIZE = _FringeScale * _InvTransformationScale * DIRECTION;
         const ImU32 col_trans = col & ~IM_COL32_A_MASK;
         const int idx_count = (points_count - 2)*3 + points_count * 6;
         const int vtx_count = (points_count * 2);
@@ -1055,8 +1058,8 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
             float dx = p1.x - p0.x;
             float dy = p1.y - p0.y;
             IM_NORMALIZE2F_OVER_ZERO(dx, dy);
-            temp_normals[i0].x = dy;
-            temp_normals[i0].y = -dx;
+            temp_normals[i0].x = dy * DIRECTION;
+            temp_normals[i0].y = -dx * DIRECTION;
         }
 
         for (int i0 = points_count - 1, i1 = 0; i1 < points_count; i0 = i1++)
@@ -1449,8 +1452,8 @@ void ImDrawList::AddLine(const ImVec2& p1, const ImVec2& p2, ImU32 col, float th
 {
     if ((col & IM_COL32_A_MASK) == 0)
         return;
-    PathLineTo(p1 + ImVec2(0.5f, 0.5f));
-    PathLineTo(p2 + ImVec2(0.5f, 0.5f));
+    PathLineTo(p1 + _HalfPixel);
+    PathLineTo(p2 + _HalfPixel);
     PathStroke(col, 0, thickness);
 
     if (svg != nullptr) {
@@ -1479,9 +1482,9 @@ void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, fl
     if ((col & IM_COL32_A_MASK) == 0)
         return;
     if (Flags & ImDrawListFlags_AntiAliasedLines)
-        PathRect(p_min + ImVec2(0.50f, 0.50f), p_max - ImVec2(0.50f, 0.50f), rounding, flags);
+        PathRect(p_min + _HalfPixel, p_max - _HalfPixel, rounding, flags);
     else
-        PathRect(p_min + ImVec2(0.50f, 0.50f), p_max - ImVec2(0.49f, 0.49f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
+        PathRect(p_min + _HalfPixel, p_max - ImVec2(_HalfPixel.x * 0.98f, _HalfPixel.y * 0.98f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
     PathStroke(col, ImDrawFlags_Closed, thickness);
 
     if (svg != nullptr) {
@@ -1691,7 +1694,7 @@ void ImDrawList::AddNgon(const ImVec2& center, float radius, ImU32 col, int num_
 
     // Because we are filling a closed shape we remove 1 from the count of segments/points
     const float a_max = (IM_PI * 2.0f) * ((float)num_segments - 1.0f) / (float)num_segments;
-    PathArcTo(center, radius - 0.5f, 0.0f, a_max, num_segments - 1);
+    PathArcTo(center, radius - _HalfPixel.x, 0.0f, a_max, num_segments - 1);
     PathStroke(col, ImDrawFlags_Closed, thickness);
 }
 

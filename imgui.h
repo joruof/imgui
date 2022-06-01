@@ -2510,6 +2510,9 @@ struct ImDrawList
     inline static int svgMaxY = 0;
     inline static int svgMinY = 0;
 
+    ImVec2 _HalfPixel = ImVec2(0.5f, 0.5f);
+    float _InvTransformationScale = 1.0;
+
     // This is what you have to render
     ImVector<ImDrawCmd>     CmdBuffer;          // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
     ImVector<ImDrawIdx>     IdxBuffer;          // Index buffer. Each command consume ImDrawCmd::ElemCount of those
