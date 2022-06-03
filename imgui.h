@@ -288,6 +288,54 @@ struct ImVec4
 };
 IM_MSVC_RUNTIME_CHECKS_RESTORE
 
+struct ImMatrix
+{
+    // Taken from this great patch: 
+    // https://github.com/ocornut/imgui/compare/master...thedmd:feature/draw-list-transformation
+
+    double m00, m01, m10, m11, m20, m21;
+    ImMatrix() { m00 = m11 = 1.0; m01 = m10 = m20 = m21 = 0.0; }
+    ImMatrix(double _m00, double _m01, double _m10, double _m11, double _m20, double _m21) { m00 = _m00; m01 = _m01; m10 = _m10; m11 = _m11; m20 = _m20; m21 = _m21; }
+#ifdef IM_MATRIX_CLASS_EXTRA          // Define constructor and implicit cast operators in imconfig.h to convert back<>forth from your math types and ImMatrix.
+    IM_MATRIX_CLASS_EXTRA
+#endif
+
+    ImMatrix Inverted() const;
+
+    static inline ImMatrix Translation(const ImVec2& p) { return Translation(p.x, p.y); }
+    static inline ImMatrix Translation(double x, double y) { return ImMatrix(1.0, 0.0, 0.0, 1.0, x, y); }
+    static inline ImMatrix Scaling(const ImVec2& p) { return Scaling(p.x, p.y); }
+    static inline ImMatrix Scaling(double x, double y) { return ImMatrix(x, 0.0, 0.0, y, 0.0, 0.0); }
+    static inline ImMatrix Shear(const ImVec2& p) { return Shear(p.x, p.y); }
+    static inline ImMatrix Shear(double x, double y) { return ImMatrix(1.0, y, x, 1.0, 0.0, 0.0); }
+    IMGUI_API static ImMatrix Rotation(double angle);
+    static inline ImMatrix Combine(const ImMatrix& lhs, const ImMatrix& rhs) // lhs * rhs = out
+    {
+        return ImMatrix(
+            rhs.m00 * lhs.m00 + rhs.m10 * lhs.m01,
+            rhs.m01 * lhs.m00 + rhs.m11 * lhs.m01,
+            rhs.m00 * lhs.m10 + rhs.m10 * lhs.m11,
+            rhs.m01 * lhs.m10 + rhs.m11 * lhs.m11,
+            rhs.m00 * lhs.m20 + rhs.m10 * lhs.m21 + rhs.m20,
+            rhs.m01 * lhs.m20 + rhs.m11 * lhs.m21 + rhs.m21);
+    }
+    inline void Transform(ImVec2* v, size_t count = 1) const
+    {
+        for (size_t i = 0; i < count; ++i, ++v)
+        {
+            *v = ImVec2(
+                m00 * v->x + m10 * v->y + m20,
+                m01 * v->x + m11 * v->y + m21);
+        }
+    }
+    inline ImVec2 Transformed(const ImVec2& v) const
+    {
+        ImVec2 p = v;
+        Transform(&p);
+        return p;
+    }
+};
+
 //-----------------------------------------------------------------------------
 // [SECTION] Dear ImGui end-user API functions
 // (Note that ImGui:: being a namespace, you can add extra ImGui:: functions in your own separate file. Please don't modify imgui source files!)
@@ -2459,6 +2507,13 @@ struct ImDrawListSplitter
     IMGUI_API void              SetCurrentChannel(ImDrawList* draw_list, int channel_idx);
 };
 
+struct ImDrawTransformation
+{
+    ImMatrix Transformation;
+    float LastInvTransformationScale;
+    ImVec2 LastHalfPixel;
+};
+
 // Flags for ImDrawList functions
 // (Legacy: bit 0 must always correspond to ImDrawFlags_Closed to be backward compatible with old API using a bool. Bits 1..3 must be unused)
 enum ImDrawFlags_
@@ -2509,9 +2564,6 @@ struct ImDrawList
     inline static int svgMaxX = 0;
     inline static int svgMaxY = 0;
     inline static int svgMinY = 0;
-
-    ImVec2 _HalfPixel = ImVec2(0.5f, 0.5f);
-    float _InvTransformationScale = 1.0;
 
     // This is what you have to render
     ImVector<ImDrawCmd>     CmdBuffer;          // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
@@ -2632,6 +2684,16 @@ struct ImDrawList
     IMGUI_API int   _CalcCircleAutoSegmentCount(float radius) const;
     IMGUI_API void  _PathArcToFastEx(const ImVec2& center, float radius, int a_min_sample, int a_max_sample, int a_step);
     IMGUI_API void  _PathArcToN(const ImVec2& center, float radius, float a_min, float a_max, int num_segments);
+    
+    // [Custom transformations]
+
+    ImVector<ImDrawTransformation> _TransformationStack;
+    float _InvTransformationScale;
+    ImVec2 _HalfPixel;
+
+    IMGUI_API void  PushTransformation(const ImMatrix& transformation);
+    IMGUI_API void  ApplyTransformation(unsigned int startIndex);
+    IMGUI_API void  PopTransformation(int count = 1);
 };
 
 // All draw data to render a Dear ImGui frame

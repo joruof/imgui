@@ -414,6 +414,38 @@ void ImGui::StyleColorsLight(ImGuiStyle* dst)
 }
 
 //-----------------------------------------------------------------------------
+// [SECTION] ImMatrix
+//-----------------------------------------------------------------------------
+ImMatrix ImMatrix::Inverted() const
+{
+    const float d00 = m11;
+    const float d01 = m01;
+
+    const float d10 = m10;
+    const float d11 = m00;
+
+    const float d20 = m10 * m21 - m11 * m20;
+    const float d21 = m00 * m21 - m01 * m20;
+
+    const float d = m00 * d00 - m10 * d01;
+
+    const float invD = d ? 1.0f / d : 0.0f;
+
+    return ImMatrix(
+         d00 * invD, -d01 * invD,
+        -d10 * invD,  d11 * invD,
+         d20 * invD, -d21 * invD);
+}
+
+ImMatrix ImMatrix::Rotation(double angle)
+{
+    const double s = sin(angle);
+    const double c = cos(angle);
+
+    return ImMatrix(c, s, -s, c, 0.0, 0.0);
+}
+
+//-----------------------------------------------------------------------------
 // [SECTION] ImDrawList
 //-----------------------------------------------------------------------------
 
@@ -468,6 +500,9 @@ void ImDrawList::_ResetForNewFrame()
     _Splitter.Clear();
     CmdBuffer.push_back(ImDrawCmd());
     _FringeScale = 1.0f;
+    _TransformationStack.resize(0);
+    _InvTransformationScale = 1.0f;
+    _HalfPixel = ImVec2(0.5f, 0.5f);
 }
 
 void ImDrawList::_ClearFreeMemory()
@@ -483,6 +518,7 @@ void ImDrawList::_ClearFreeMemory()
     _TextureIdStack.clear();
     _Path.clear();
     _Splitter.ClearFreeMemory();
+    _TransformationStack.clear();
 }
 
 ImDrawList* ImDrawList::CloneOutput() const
@@ -670,6 +706,82 @@ void ImDrawList::PopTextureID()
     _TextureIdStack.pop_back();
     _CmdHeader.TextureId = (_TextureIdStack.Size == 0) ? (ImTextureID)NULL : _TextureIdStack.Data[_TextureIdStack.Size - 1];
     _OnChangedTextureID();
+}
+
+void ImDrawList::PushTransformation(const ImMatrix& transformation)
+{
+    ImDrawTransformation tr;
+    tr.Transformation             = transformation;
+    tr.LastInvTransformationScale = _InvTransformationScale;
+    tr.LastHalfPixel              = _HalfPixel;
+
+    const float scaleX = sqrtf(
+        transformation.m00 * transformation.m00 +
+        transformation.m01 * transformation.m01);
+    const float signX = (transformation.m00) < 0.0f ? -1.0f : 1.0f;
+
+    const float scaleY = sqrtf(
+        transformation.m10 * transformation.m10 +
+        transformation.m11 * transformation.m11);
+    const float signY = (transformation.m11) < 0.0f ? -1.0f : 1.0f;
+
+    const float scale = (scaleX + scaleY) * 0.5f;
+
+    const float invScale = scale > 0.0f ? (1.0f / scale) : 1.0f;
+
+    _InvTransformationScale = _InvTransformationScale * invScale;
+    _HalfPixel              = ImVec2(
+        _HalfPixel.x * signX * invScale,
+        _HalfPixel.y * signY * invScale);
+
+    if (_TransformationStack.size() > 0) {
+        ImDrawTransformation& lastTrans = _TransformationStack.back();
+        tr.Transformation = ImMatrix::Combine(
+                transformation, lastTrans.Transformation);
+    }
+
+    _TransformationStack.push_back(tr);
+}
+
+void ImDrawList::ApplyTransformation(unsigned int startIndex) { 
+
+    if (_TransformationStack.size() == 0) {
+        return;
+    }
+
+    ImDrawTransformation& tr = _TransformationStack.back();
+
+    if (startIndex < _VtxCurrentIdx)
+    {
+        const ImMatrix& m = tr.Transformation;
+
+        ImDrawVert* const vertexBegin = VtxBuffer.Data + startIndex;
+        ImDrawVert* const vertexEnd   = VtxBuffer.Data + _VtxCurrentIdx;
+
+        for (ImDrawVert* vertex = vertexBegin; vertex != vertexEnd; ++vertex)
+        {
+            const float x = vertex->pos.x;
+            const float y = vertex->pos.y;
+
+            vertex->pos.x = m.m00 * x + m.m10 * y + m.m20;
+            vertex->pos.y = m.m01 * x + m.m11 * y + m.m21;
+        }
+    }
+}
+
+void ImDrawList::PopTransformation(int count)
+{
+    IM_ASSERT(_TransformationStack.Size > 0);
+
+    for (int i = 0; i < count; ++i)
+    {
+        const ImDrawTransformation& tr = _TransformationStack.back();
+
+        _InvTransformationScale = tr.LastInvTransformationScale;
+        _HalfPixel              = tr.LastHalfPixel;
+
+        _TransformationStack.pop_back();
+    }
 }
 
 // Reserve space for a number of vertices and indices.
