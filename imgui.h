@@ -2510,8 +2510,9 @@ struct ImDrawListSplitter
 struct ImDrawTransformation
 {
     ImMatrix Transformation;
-    float LastInvTransformationScale;
-    ImVec2 LastHalfPixel;
+    double LastInvTransformationScale;
+    double LastHalfPixelX;
+    double LastHalfPixelY;
 };
 
 // Flags for ImDrawList functions
@@ -2688,8 +2689,9 @@ struct ImDrawList
     // [Custom transformations]
 
     ImVector<ImDrawTransformation> _TransformationStack;
-    float _InvTransformationScale;
-    ImVec2 _HalfPixel;
+    double _InvTransformationScale;
+    double _HalfPixelX;
+    double _HalfPixelY;
 
     IMGUI_API void  PushTransformation(const ImMatrix& transformation);
     IMGUI_API void  ApplyTransformation(unsigned int startIndex);

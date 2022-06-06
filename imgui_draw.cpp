@@ -501,8 +501,9 @@ void ImDrawList::_ResetForNewFrame()
     CmdBuffer.push_back(ImDrawCmd());
     _FringeScale = 1.0f;
     _TransformationStack.resize(0);
-    _InvTransformationScale = 1.0f;
-    _HalfPixel = ImVec2(0.5f, 0.5f);
+    _InvTransformationScale = 1.0;
+    _HalfPixelX = 0.5;
+    _HalfPixelY = 0.5;
 }
 
 void ImDrawList::_ClearFreeMemory()
@@ -713,26 +714,26 @@ void ImDrawList::PushTransformation(const ImMatrix& transformation)
     ImDrawTransformation tr;
     tr.Transformation             = transformation;
     tr.LastInvTransformationScale = _InvTransformationScale;
-    tr.LastHalfPixel              = _HalfPixel;
+    tr.LastHalfPixelX              = _HalfPixelX;
+    tr.LastHalfPixelY              = _HalfPixelY;
 
-    const float scaleX = sqrtf(
+    const double scaleX = sqrt(
         transformation.m00 * transformation.m00 +
         transformation.m01 * transformation.m01);
-    const float signX = (transformation.m00) < 0.0f ? -1.0f : 1.0f;
+    const double signX = (transformation.m00) < 0.0f ? -1.0f : 1.0f;
 
-    const float scaleY = sqrtf(
+    const double scaleY = sqrt(
         transformation.m10 * transformation.m10 +
         transformation.m11 * transformation.m11);
-    const float signY = (transformation.m11) < 0.0f ? -1.0f : 1.0f;
+    const double signY = (transformation.m11) < 0.0f ? -1.0f : 1.0f;
 
-    const float scale = (scaleX + scaleY) * 0.5f;
+    const double scale = (scaleX + scaleY) * 0.5f;
 
-    const float invScale = scale > 0.0f ? (1.0f / scale) : 1.0f;
+    const double invScale = scale > 0.0f ? (1.0f / scale) : 1.0f;
 
     _InvTransformationScale = _InvTransformationScale * invScale;
-    _HalfPixel              = ImVec2(
-        _HalfPixel.x * signX * invScale,
-        _HalfPixel.y * signY * invScale);
+    _HalfPixelX = _HalfPixelX * signX * invScale;
+    _HalfPixelY = _HalfPixelY * signY * invScale;
 
     if (_TransformationStack.size() > 0) {
         ImDrawTransformation& lastTrans = _TransformationStack.back();
@@ -778,7 +779,8 @@ void ImDrawList::PopTransformation(int count)
         const ImDrawTransformation& tr = _TransformationStack.back();
 
         _InvTransformationScale = tr.LastInvTransformationScale;
-        _HalfPixel              = tr.LastHalfPixel;
+        _HalfPixelX              = tr.LastHalfPixelX;
+        _HalfPixelY              = tr.LastHalfPixelY;
 
         _TransformationStack.pop_back();
     }
@@ -1145,7 +1147,7 @@ void ImDrawList::AddConvexPolyFilled(const ImVec2* points, const int points_coun
     if (Flags & ImDrawListFlags_AntiAliasedFill)
     {
         // Anti-aliased Fill
-        const float DIRECTION = (((_HalfPixel.x < 0.0f) ^ (_HalfPixel.y < 0.0f)) ? -1.0f : 1.0f);
+        const float DIRECTION = (((_HalfPixelX < 0.0f) ^ (_HalfPixelY < 0.0f)) ? -1.0f : 1.0f);
         const float AA_SIZE = _FringeScale * _InvTransformationScale * DIRECTION;
         const ImU32 col_trans = col & ~IM_COL32_A_MASK;
         const int idx_count = (points_count - 2)*3 + points_count * 6;
@@ -1564,8 +1566,8 @@ void ImDrawList::AddLine(const ImVec2& p1, const ImVec2& p2, ImU32 col, float th
 {
     if ((col & IM_COL32_A_MASK) == 0)
         return;
-    PathLineTo(p1 + _HalfPixel);
-    PathLineTo(p2 + _HalfPixel);
+    PathLineTo(p1 + ImVec2(_HalfPixelX, _HalfPixelY));
+    PathLineTo(p2 + ImVec2(_HalfPixelX, _HalfPixelY));
     PathStroke(col, 0, thickness);
 
     if (svg != nullptr) {
@@ -1594,9 +1596,9 @@ void ImDrawList::AddRect(const ImVec2& p_min, const ImVec2& p_max, ImU32 col, fl
     if ((col & IM_COL32_A_MASK) == 0)
         return;
     if (Flags & ImDrawListFlags_AntiAliasedLines)
-        PathRect(p_min + _HalfPixel, p_max - _HalfPixel, rounding, flags);
+        PathRect(p_min + ImVec2(_HalfPixelX, _HalfPixelY), p_max - ImVec2(_HalfPixelX, _HalfPixelY), rounding, flags);
     else
-        PathRect(p_min + _HalfPixel, p_max - ImVec2(_HalfPixel.x * 0.98f, _HalfPixel.y * 0.98f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
+        PathRect(p_min + ImVec2(_HalfPixelX, _HalfPixelY), p_max - ImVec2(_HalfPixelX * 0.98f, _HalfPixelY * 0.98f), rounding, flags); // Better looking lower-right corner and rounded non-AA shapes.
     PathStroke(col, ImDrawFlags_Closed, thickness);
 
     if (svg != nullptr) {
@@ -1806,7 +1808,7 @@ void ImDrawList::AddNgon(const ImVec2& center, float radius, ImU32 col, int num_
 
     // Because we are filling a closed shape we remove 1 from the count of segments/points
     const float a_max = (IM_PI * 2.0f) * ((float)num_segments - 1.0f) / (float)num_segments;
-    PathArcTo(center, radius - _HalfPixel.x, 0.0f, a_max, num_segments - 1);
+    PathArcTo(center, radius - _HalfPixelX, 0.0f, a_max, num_segments - 1);
     PathStroke(col, ImDrawFlags_Closed, thickness);
 }
 
